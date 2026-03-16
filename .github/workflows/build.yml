@@ -1,4 +1,4 @@
-name: Build APK
+name: Build Ganesh APK
 
 on:
   push:
@@ -14,84 +14,262 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: Setup JDK
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Install Bubblewrap
-        run: npm install -g @bubblewrap/cli
-
-      - name: Generate Keystore
+      - name: Create Android Project
         run: |
-          keytool -genkeypair \
-            -v \
-            -keystore android.keystore \
-            -alias ganeshplay \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -storepass ganesh123 \
-            -keypass ganesh123 \
-            -dname "CN=Ganesh, OU=Play, O=GaneshPlay, L=IN, S=IN, C=IN"
+          mkdir -p ganesh-app/app/src/main/java/com/example/ganeshplay
+          mkdir -p ganesh-app/app/src/main/res/layout
+          mkdir -p ganesh-app/app/src/main/res/values
+          mkdir -p ganesh-app/app/src/main/res/drawable
+          mkdir -p ganesh-app/app/src/main/res/mipmap-hdpi
+          mkdir -p ganesh-app/app/src/main/res/mipmap-mdpi
+          mkdir -p ganesh-app/app/src/main/res/mipmap-xhdpi
+          mkdir -p ganesh-app/app/src/main/res/mipmap-xxhdpi
+          mkdir -p ganesh-app/app/src/main/res/mipmap-xxxhdpi
 
-      - name: Create TWA Manifest
+      - name: Download App Icon
         run: |
-          mkdir -p twa-project
-          cat > twa-project/twa-manifest.json << 'EOF'
-          {
-            "packageId": "com.example.ganeshplay",
-            "host": "ganeshplay.com",
-            "name": "Shri Ganesh Matka",
-            "launcherName": "Ganesh",
-            "display": "standalone",
-            "orientation": "portrait",
-            "themeColor": "#FF6B00",
-            "backgroundColor": "#ffffff",
-            "startUrl": "/app/login.php",
-            "iconUrl": "https://ganeshplay.com/app/img/shri_ganesh_logo.png",
-            "maskableIconUrl": "https://ganeshplay.com/app/img/shri_ganesh_logo.png",
-            "appVersion": "1",
-            "appVersionCode": 1,
-            "signingKey": {
-              "path": "../../android.keystore",
-              "alias": "ganeshplay"
-            },
-            "minSdkVersion": 19,
-            "targetSdkVersion": 34,
-            "navigationColor": "#FF6B00",
-            "navigationColorDark": "#FF6B00",
-            "navigationDividerColor": "#FF6B00",
-            "navigationDividerColorDark": "#FF6B00",
-            "enableNotifications": true,
-            "shortcuts": [],
-            "generatorApp": "bubblewrap-cli",
-            "webManifestUrl": "https://ganeshplay.com/manifest.json",
-            "isChromeOSOnly": false,
-            "isMetaQuest": false,
-            "fullScopeUrl": "https://ganeshplay.com/app/",
-            "minimalUiFallback": false,
-            "enableSiteSettingsShortcut": true
+          curl -L "https://ganeshplay.com/app/img/shri_ganesh_logo.png" \
+            -o ganesh-app/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          cp ganesh-app/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png \
+             ganesh-app/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          cp ganesh-app/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png \
+             ganesh-app/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          cp ganesh-app/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png \
+             ganesh-app/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          cp ganesh-app/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png \
+             ganesh-app/app/src/main/res/mipmap-mdpi/ic_launcher.png
+
+      - name: Create MainActivity
+        run: |
+          cat > ganesh-app/app/src/main/java/com/example/ganeshplay/MainActivity.java << 'EOF'
+          package com.example.ganeshplay;
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import android.webkit.WebSettings;
+          import android.webkit.PermissionRequest;
+          import android.webkit.WebChromeClient;
+          import android.Manifest;
+          import android.content.pm.PackageManager;
+          import androidx.core.app.ActivityCompat;
+          import androidx.core.content.ContextCompat;
+          import androidx.appcompat.app.AppCompatActivity;
+
+          public class MainActivity extends AppCompatActivity {
+              private WebView webView;
+              private static final int NOTIFICATION_PERMISSION_CODE = 1;
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  setContentView(R.layout.activity_main);
+
+                  webView = findViewById(R.id.webview);
+                  WebSettings settings = webView.getSettings();
+                  settings.setJavaScriptEnabled(true);
+                  settings.setDomStorageEnabled(true);
+                  settings.setAllowFileAccess(true);
+                  settings.setMediaPlaybackRequiresUserGesture(false);
+                  settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+
+                  webView.setWebViewClient(new WebViewClient());
+                  webView.setWebChromeClient(new WebChromeClient() {
+                      @Override
+                      public void onPermissionRequest(PermissionRequest request) {
+                          request.grant(request.getResources());
+                      }
+                  });
+
+                  if (ContextCompat.checkSelfPermission(this,
+                          Manifest.permission.POST_NOTIFICATIONS)
+                          != PackageManager.PERMISSION_GRANTED) {
+                      ActivityCompat.requestPermissions(this,
+                          new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                          NOTIFICATION_PERMISSION_CODE);
+                  }
+
+                  webView.loadUrl("https://ganeshplay.com/app/login.php");
+              }
+
+              @Override
+              public void onBackPressed() {
+                  if (webView.canGoBack()) {
+                      webView.goBack();
+                  } else {
+                      super.onBackPressed();
+                  }
+              }
           }
+          EOF
+
+      - name: Create Layout
+        run: |
+          cat > ganesh-app/app/src/main/res/layout/activity_main.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent">
+              <WebView
+                  android:id="@+id/webview"
+                  android:layout_width="match_parent"
+                  android:layout_height="match_parent" />
+          </RelativeLayout>
+          EOF
+
+      - name: Create Strings
+        run: |
+          cat > ganesh-app/app/src/main/res/values/strings.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <string name="app_name">Shri Ganesh Matka</string>
+          </resources>
+          EOF
+
+      - name: Create Colors
+        run: |
+          cat > ganesh-app/app/src/main/res/values/colors.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <color name="colorPrimary">#FF6B00</color>
+              <color name="colorPrimaryDark">#E65100</color>
+              <color name="colorAccent">#FF6B00</color>
+          </resources>
+          EOF
+
+      - name: Create Styles
+        run: |
+          cat > ganesh-app/app/src/main/res/values/styles.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
+                  <item name="colorPrimary">@color/colorPrimary</item>
+                  <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+                  <item name="colorAccent">@color/colorAccent</item>
+              </style>
+          </resources>
+          EOF
+
+      - name: Create AndroidManifest
+        run: |
+          cat > ganesh-app/app/src/main/AndroidManifest.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              package="com.example.ganeshplay">
+              <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+              <application
+                  android:allowBackup="true"
+                  android:icon="@mipmap/ic_launcher"
+                  android:label="@string/app_name"
+                  android:theme="@style/AppTheme"
+                  android:usesCleartextTraffic="true">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:screenOrientation="portrait">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
           EOF
 
       - name: Create google-services.json
         run: |
-          echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > twa-project/google-services.json
+          echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > ganesh-app/app/google-services.json
+
+      - name: Create app build.gradle
+        run: |
+          cat > ganesh-app/app/build.gradle << 'EOF'
+          plugins {
+              id 'com.android.application'
+              id 'com.google.gms.google-services'
+          }
+          android {
+              compileSdkVersion 34
+              defaultConfig {
+                  applicationId "com.example.ganeshplay"
+                  minSdkVersion 21
+                  targetSdkVersion 34
+                  versionCode 1
+                  versionName "1.0"
+              }
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                      signingConfig signingConfigs.debug
+                  }
+              }
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+          dependencies {
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'com.google.firebase:firebase-messaging:23.4.0'
+              implementation platform('com.google.firebase:firebase-bom:32.7.0')
+          }
+          EOF
+
+      - name: Create root build.gradle
+        run: |
+          cat > ganesh-app/build.gradle << 'EOF'
+          buildscript {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:8.2.0'
+                  classpath 'com.google.gms:google-services:4.4.0'
+              }
+          }
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          EOF
+
+      - name: Create settings.gradle
+        run: |
+          cat > ganesh-app/settings.gradle << 'EOF'
+          rootProject.name = "GaneshPlay"
+          include ':app'
+          EOF
+
+      - name: Create gradle wrapper properties
+        run: |
+          mkdir -p ganesh-app/gradle/wrapper
+          cat > ganesh-app/gradle/wrapper/gradle-wrapper.properties << 'EOF'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.2-bin.zip
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          EOF
+
+      - name: Setup Gradle Wrapper
+        run: |
+          cd ganesh-app
+          gradle wrapper --gradle-version 8.2
 
       - name: Build APK
         run: |
-          cd twa-project
-          bubblewrap build --skipPwaValidation
-        env:
-          BUBBLEWRAP_KEYSTORE_PASSWORD: ganesh123
-          BUBBLEWRAP_KEY_PASSWORD: ganesh123
+          cd ganesh-app
+          ./gradlew assembleRelease --no-daemon
 
       - name: Find APK
         run: find . -name "*.apk" -type f
@@ -100,5 +278,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ganesh-apk
-          path: twa-project/**/*.apk
+          path: ganesh-app/app/build/outputs/apk/release/*.apk
           if-no-files-found: warn
