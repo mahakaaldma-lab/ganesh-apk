@@ -20,36 +20,34 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Create Android Project
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Create Android Project Structure
         run: |
           mkdir -p ganesh-app/app/src/main/java/com/example/ganeshplay
           mkdir -p ganesh-app/app/src/main/res/layout
           mkdir -p ganesh-app/app/src/main/res/values
-          mkdir -p ganesh-app/app/src/main/res/drawable
           mkdir -p ganesh-app/app/src/main/res/mipmap-hdpi
           mkdir -p ganesh-app/app/src/main/res/mipmap-mdpi
           mkdir -p ganesh-app/app/src/main/res/mipmap-xhdpi
           mkdir -p ganesh-app/app/src/main/res/mipmap-xxhdpi
           mkdir -p ganesh-app/app/src/main/res/mipmap-xxxhdpi
+          mkdir -p ganesh-app/gradle/wrapper
 
       - name: Download App Icon
         run: |
           curl -L "https://ganeshplay.com/app/img/shri_ganesh_logo.png" \
-            -o ganesh-app/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-          cp ganesh-app/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png \
-             ganesh-app/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
-          cp ganesh-app/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png \
-             ganesh-app/app/src/main/res/mipmap-xhdpi/ic_launcher.png
-          cp ganesh-app/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png \
-             ganesh-app/app/src/main/res/mipmap-hdpi/ic_launcher.png
-          cp ganesh-app/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png \
-             ganesh-app/app/src/main/res/mipmap-mdpi/ic_launcher.png
+            -o icon.png
+          for dir in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            cp icon.png ganesh-app/app/src/main/res/mipmap-$dir/ic_launcher.png
+            cp icon.png ganesh-app/app/src/main/res/mipmap-$dir/ic_launcher_round.png
+          done
 
       - name: Create MainActivity
         run: |
-          cat > ganesh-app/app/src/main/java/com/example/ganeshplay/MainActivity.java << 'EOF'
+          cat > ganesh-app/app/src/main/java/com/example/ganeshplay/MainActivity.java << 'JAVAEOF'
           package com.example.ganeshplay;
-          import android.app.Activity;
           import android.os.Bundle;
           import android.webkit.WebView;
           import android.webkit.WebViewClient;
@@ -61,24 +59,18 @@ jobs:
           import androidx.core.app.ActivityCompat;
           import androidx.core.content.ContextCompat;
           import androidx.appcompat.app.AppCompatActivity;
-
           public class MainActivity extends AppCompatActivity {
               private WebView webView;
-              private static final int NOTIFICATION_PERMISSION_CODE = 1;
-
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   setContentView(R.layout.activity_main);
-
                   webView = findViewById(R.id.webview);
                   WebSettings settings = webView.getSettings();
                   settings.setJavaScriptEnabled(true);
                   settings.setDomStorageEnabled(true);
                   settings.setAllowFileAccess(true);
-                  settings.setMediaPlaybackRequiresUserGesture(false);
                   settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-
                   webView.setWebViewClient(new WebViewClient());
                   webView.setWebChromeClient(new WebChromeClient() {
                       @Override
@@ -86,18 +78,16 @@ jobs:
                           request.grant(request.getResources());
                       }
                   });
-
-                  if (ContextCompat.checkSelfPermission(this,
-                          Manifest.permission.POST_NOTIFICATIONS)
-                          != PackageManager.PERMISSION_GRANTED) {
-                      ActivityCompat.requestPermissions(this,
-                          new String[]{Manifest.permission.POST_NOTIFICATIONS},
-                          NOTIFICATION_PERMISSION_CODE);
+                  if (android.os.Build.VERSION.SDK_INT >= 33) {
+                      if (ContextCompat.checkSelfPermission(this,
+                              Manifest.permission.POST_NOTIFICATIONS)
+                              != PackageManager.PERMISSION_GRANTED) {
+                          ActivityCompat.requestPermissions(this,
+                              new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1);
+                      }
                   }
-
                   webView.loadUrl("https://ganeshplay.com/app/login.php");
               }
-
               @Override
               public void onBackPressed() {
                   if (webView.canGoBack()) {
@@ -107,9 +97,9 @@ jobs:
                   }
               }
           }
-          EOF
+          JAVAEOF
 
-      - name: Create Layout
+      - name: Create Layout XML
         run: |
           cat > ganesh-app/app/src/main/res/layout/activity_main.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
@@ -119,11 +109,11 @@ jobs:
               <WebView
                   android:id="@+id/webview"
                   android:layout_width="match_parent"
-                  android:layout_height="match_parent" />
+                  android:layout_height="match_parent"/>
           </RelativeLayout>
           EOF
 
-      - name: Create Strings
+      - name: Create Resources
         run: |
           cat > ganesh-app/app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
@@ -132,8 +122,6 @@ jobs:
           </resources>
           EOF
 
-      - name: Create Colors
-        run: |
           cat > ganesh-app/app/src/main/res/values/colors.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
@@ -143,8 +131,6 @@ jobs:
           </resources>
           EOF
 
-      - name: Create Styles
-        run: |
           cat > ganesh-app/app/src/main/res/values/styles.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
@@ -168,6 +154,7 @@ jobs:
               <application
                   android:allowBackup="true"
                   android:icon="@mipmap/ic_launcher"
+                  android:roundIcon="@mipmap/ic_launcher_round"
                   android:label="@string/app_name"
                   android:theme="@style/AppTheme"
                   android:usesCleartextTraffic="true">
@@ -196,11 +183,11 @@ jobs:
               id 'com.google.gms.google-services'
           }
           android {
-              compileSdkVersion 34
+              compileSdk 34
               defaultConfig {
                   applicationId "com.example.ganeshplay"
-                  minSdkVersion 21
-                  targetSdkVersion 34
+                  minSdk 21
+                  targetSdk 34
                   versionCode 1
                   versionName "1.0"
               }
@@ -214,11 +201,13 @@ jobs:
                   sourceCompatibility JavaVersion.VERSION_17
                   targetCompatibility JavaVersion.VERSION_17
               }
+              namespace 'com.example.ganeshplay'
           }
           dependencies {
               implementation 'androidx.appcompat:appcompat:1.6.1'
-              implementation 'com.google.firebase:firebase-messaging:23.4.0'
+              implementation 'androidx.core:core:1.12.0'
               implementation platform('com.google.firebase:firebase-bom:32.7.0')
+              implementation 'com.google.firebase:firebase-messaging'
           }
           EOF
 
@@ -231,8 +220,8 @@ jobs:
                   mavenCentral()
               }
               dependencies {
-                  classpath 'com.android.tools.build:gradle:8.2.0'
-                  classpath 'com.google.gms:google-services:4.4.0'
+                  classpath 'com.android.tools.build:gradle:8.3.2'
+                  classpath 'com.google.gms:google-services:4.4.1'
               }
           }
           allprojects {
@@ -241,35 +230,57 @@ jobs:
                   mavenCentral()
               }
           }
+          task clean(type: Delete) {
+              delete rootProject.buildDir
+          }
           EOF
 
       - name: Create settings.gradle
         run: |
           cat > ganesh-app/settings.gradle << 'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
           rootProject.name = "GaneshPlay"
           include ':app'
           EOF
 
-      - name: Create gradle wrapper properties
+      - name: Create Gradle Wrapper Properties
         run: |
-          mkdir -p ganesh-app/gradle/wrapper
           cat > ganesh-app/gradle/wrapper/gradle-wrapper.properties << 'EOF'
           distributionBase=GRADLE_USER_HOME
           distributionPath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-8.2-bin.zip
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.4-bin.zip
           zipStoreBase=GRADLE_USER_HOME
           zipStorePath=wrapper/dists
           EOF
 
-      - name: Setup Gradle Wrapper
+      - name: Download Gradle Wrapper
         run: |
           cd ganesh-app
-          gradle wrapper --gradle-version 8.2
+          curl -L "https://services.gradle.org/distributions/gradle-8.4-bin.zip" \
+            -o gradle-8.4-bin.zip
+          unzip -q gradle-8.4-bin.zip
+          ./gradle-8.4/bin/gradle wrapper
+          chmod +x gradlew
 
       - name: Build APK
         run: |
           cd ganesh-app
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease --no-daemon --stacktrace
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
 
       - name: Find APK
         run: find . -name "*.apk" -type f
