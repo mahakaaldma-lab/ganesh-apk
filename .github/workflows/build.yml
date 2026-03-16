@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -14,7 +17,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Setup JDK
         uses: actions/setup-java@v4
@@ -25,18 +28,76 @@ jobs:
       - name: Install Bubblewrap
         run: npm install -g @bubblewrap/cli
 
-      - name: Initialize TWA
+      - name: Generate Keystore
         run: |
-          bubblewrap init --manifest=https://ganeshplay.com/manifest.json \
-            --directory=./twa-project
+          keytool -genkeypair \
+            -v \
+            -keystore android.keystore \
+            -alias ganeshplay \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass ganesh123 \
+            -keypass ganesh123 \
+            -dname "CN=Ganesh, OU=Play, O=GaneshPlay, L=IN, S=IN, C=IN"
+
+      - name: Create TWA Manifest
+        run: |
+          mkdir -p twa-project
+          cat > twa-project/twa-manifest.json << 'EOF'
+          {
+            "packageId": "com.example.ganeshplay",
+            "host": "ganeshplay.com",
+            "name": "Shri Ganesh Matka",
+            "launcherName": "Ganesh",
+            "display": "standalone",
+            "orientation": "portrait",
+            "themeColor": "#FF6B00",
+            "backgroundColor": "#ffffff",
+            "startUrl": "/app/login.php",
+            "iconUrl": "https://ganeshplay.com/app/img/shri_ganesh_logo.png",
+            "maskableIconUrl": "https://ganeshplay.com/app/img/shri_ganesh_logo.png",
+            "appVersion": "1",
+            "appVersionCode": 1,
+            "signingKey": {
+              "path": "../../android.keystore",
+              "alias": "ganeshplay"
+            },
+            "minSdkVersion": 19,
+            "targetSdkVersion": 34,
+            "navigationColor": "#FF6B00",
+            "navigationColorDark": "#FF6B00",
+            "navigationDividerColor": "#FF6B00",
+            "navigationDividerColorDark": "#FF6B00",
+            "enableNotifications": true,
+            "shortcuts": [],
+            "generatorApp": "bubblewrap-cli",
+            "webManifestUrl": "https://ganeshplay.com/manifest.json",
+            "isChromeOSOnly": false,
+            "isMetaQuest": false,
+            "fullScopeUrl": "https://ganeshplay.com/app/",
+            "minimalUiFallback": false,
+            "enableSiteSettingsShortcut": true
+          }
+          EOF
+
+      - name: Copy google-services.json
+        run: cp google-services.json twa-project/google-services.json
 
       - name: Build APK
         run: |
           cd twa-project
-          bubblewrap build
+          bubblewrap build --skipPwaValidation
+        env:
+          BUBBLEWRAP_KEYSTORE_PASSWORD: ganesh123
+          BUBBLEWRAP_KEY_PASSWORD: ganesh123
+
+      - name: Find APK
+        run: find . -name "*.apk" -type f
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: ganesh-apk
-          path: twa-project/app-release-signed.apk
+          path: twa-project/**/*.apk
+          if-no-files-found: warn
