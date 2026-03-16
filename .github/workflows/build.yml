@@ -214,24 +214,9 @@ jobs:
       - name: Create root build.gradle
         run: |
           cat > ganesh-app/build.gradle << 'EOF'
-          buildscript {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-              dependencies {
-                  classpath 'com.android.tools.build:gradle:8.3.2'
-                  classpath 'com.google.gms:google-services:4.4.1'
-              }
-          }
-          allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-          task clean(type: Delete) {
-              delete rootProject.buildDir
+          plugins {
+              id 'com.android.application' version '8.3.2' apply false
+              id 'com.google.gms.google-services' version '4.4.1' apply false
           }
           EOF
 
@@ -246,7 +231,6 @@ jobs:
               }
           }
           dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
               repositories {
                   google()
                   mavenCentral()
