@@ -1,0 +1,23 @@
+{
+  "name": "Shri Ganesh Matka",
+  "short_name": "Ganesh",
+  "description": "Shri Ganesh Matka",
+  "start_url": "https://ganeshplay.com",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#FF6B00",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://ganeshplay.com/app/img/shri_ganesh_logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://ganeshplay.com/app/img/shri_ganesh_logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
