@@ -1,8 +1,9 @@
 {
   "name": "Shri Ganesh Matka",
   "short_name": "Ganesh",
-  "description": "Shri Ganesh Matka",
-  "start_url": "https://ganeshplay.com",
+  "description": "Shri Ganesh Matka Play",
+  "start_url": "/app/login.php",
+  "scope": "/app/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#FF6B00",
